@@ -59,6 +59,8 @@
     self.requestedCount++;
     [self.manager loadImageWithURL:self.prefetchURLs[index] options:self.options progress:nil completed:^(UIImage *image, NSData *data, NSError *error, SDImageCacheType cacheType, BOOL finished, NSURL *imageURL) {
         if (!finished) return;
+        /// Fixes http://crashes.to/s/240f1817007
+        if (index >= self.prefetchURLs.count) return;
         self.finishedCount++;
 
         if (image) {
