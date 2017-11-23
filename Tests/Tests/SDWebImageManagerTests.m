@@ -9,8 +9,6 @@
 #import "SDTestCase.h"
 #import <SDWebImage/SDWebImageManager.h>
 
-NSString *workingImageURL = @"http://s3.amazonaws.com/fast-image-cache/demo-images/FICDDemoImage001.jpg";
-
 @interface SDWebImageManagerTests : SDTestCase
 
 @end
@@ -25,7 +23,7 @@ NSString *workingImageURL = @"http://s3.amazonaws.com/fast-image-cache/demo-imag
 - (void)test02ThatDownloadInvokesCompletionBlockWithCorrectParamsAsync {
     __block XCTestExpectation *expectation = [self expectationWithDescription:@"Image download completes"];
 
-    NSURL *originalImageURL = [NSURL URLWithString:workingImageURL];
+    NSURL *originalImageURL = [NSURL URLWithString:kTestJpegURL];
     
     [[SDWebImageManager sharedManager] loadImageWithURL:originalImageURL
                                                 options:SDWebImageRefreshCached
@@ -65,7 +63,7 @@ NSString *workingImageURL = @"http://s3.amazonaws.com/fast-image-cache/demo-imag
 
 - (void)test04CachedImageExistsForURL {
     __block XCTestExpectation *expectation = [self expectationWithDescription:@"Image exists in cache"];
-    NSURL *imageURL = [NSURL URLWithString:workingImageURL];
+    NSURL *imageURL = [NSURL URLWithString:kTestJpegURL];
     [[SDWebImageManager sharedManager] cachedImageExistsForURL:imageURL completion:^(BOOL isInCache) {
         if (isInCache) {
             [expectation fulfill];
@@ -73,12 +71,12 @@ NSString *workingImageURL = @"http://s3.amazonaws.com/fast-image-cache/demo-imag
             XCTFail(@"Image should be in cache");
         }
     }];
-    [self waitForExpectationsWithTimeout:kAsyncTestTimeout handler:nil];
+    [self waitForExpectationsWithCommonTimeout];
 }
 
 - (void)test05DiskImageExistsForURL {
     __block XCTestExpectation *expectation = [self expectationWithDescription:@"Image exists in disk cache"];
-    NSURL *imageURL = [NSURL URLWithString:workingImageURL];
+    NSURL *imageURL = [NSURL URLWithString:kTestJpegURL];
     [[SDWebImageManager sharedManager] diskImageExistsForURL:imageURL completion:^(BOOL isInCache) {
         if (isInCache) {
             [expectation fulfill];
@@ -92,7 +90,9 @@ NSString *workingImageURL = @"http://s3.amazonaws.com/fast-image-cache/demo-imag
 - (void)test06CancellAll {
     XCTestExpectation *expectation = [self expectationWithDescription:@"Cancel"];
     
-    NSURL *imageURL = [NSURL URLWithString:@"http://s3.amazonaws.com/fast-image-cache/demo-images/FICDDemoImage006.jpg"];
+    // need a bigger image here, that is why we don't use kTestJpegURL
+    // if the image is too small, it will get downloaded before we can cancel :)
+    NSURL *imageURL = [NSURL URLWithString:@"https://s3.amazonaws.com/fast-image-cache/demo-images/FICDDemoImage001.jpg"];
     [[SDWebImageManager sharedManager] loadImageWithURL:imageURL options:0 progress:nil completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
         XCTFail(@"Should not get here");
     }];
@@ -105,6 +105,25 @@ NSString *workingImageURL = @"http://s3.amazonaws.com/fast-image-cache/demo-imag
         [expectation fulfill];
     });
     
+    [self waitForExpectationsWithCommonTimeout];
+}
+
+- (void)test07ThatLoadImageWithSDWebImageRefreshCachedWorks {
+    XCTestExpectation *expectation = [self expectationWithDescription:@"Image download twice with SDWebImageRefresh failed"];
+    NSURL *originalImageURL = [NSURL URLWithString:kTestJpegURL];
+    [[SDImageCache sharedImageCache] clearDiskOnCompletion:nil];
+    
+    [[SDWebImageManager sharedManager] loadImageWithURL:originalImageURL options:SDWebImageRefreshCached progress:nil completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
+        expect(image).toNot.beNil();
+        expect(error).to.beNil();
+        // #1993, load image with SDWebImageRefreshCached twice should not fail if the first time success.
+        
+        [[SDWebImageManager sharedManager] loadImageWithURL:originalImageURL options:SDWebImageRefreshCached progress:nil completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, SDImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL) {
+            expect(image).toNot.beNil();
+            expect(error).to.beNil();
+            [expectation fulfill];
+        }];
+    }];
     [self waitForExpectationsWithCommonTimeout];
 }
 
